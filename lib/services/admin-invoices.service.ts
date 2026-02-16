@@ -86,7 +86,7 @@ export class AdminInvoicesService {
             if (filters.date_to) params.append('date_to', filters.date_to);
 
             const response = await apiClient.get<AdminInvoicesResponse>(`/api/portal/invoices?${params.toString()}`);
-            return response.data;
+            return response;
         } catch (error) {
             console.error('Error fetching invoices:', error);
             throw error;
@@ -114,10 +114,10 @@ export class AdminInvoicesService {
     async getReceiptDetails(readingId: number): Promise<AdminReceiptDetails> {
         try {
             const response = await apiClient.get<any>(`/api/portal/readings/${readingId}/receipt`);
-            if (response.data.status === 'success') {
-                return response.data.data;
+            if (response.status === 'success') {
+                return response.data;
             }
-            throw new Error(response.data.message || 'Error fetching receipt details');
+            throw new Error(response.message || 'Error fetching receipt details');
         } catch (error) {
             console.error('Error fetching receipt details:', error);
             throw error;

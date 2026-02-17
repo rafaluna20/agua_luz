@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  QrCode,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -54,6 +55,11 @@ const navItems: NavItem[] = [
     name: "Recibos",
     href: "/admin/recibos",
     icon: FileText,
+  },
+  {
+    name: "Generar QR",
+    href: "/admin/qr-generator",
+    icon: QrCode,
   },
   {
     name: "Reportes",

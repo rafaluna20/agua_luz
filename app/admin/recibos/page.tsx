@@ -96,9 +96,13 @@ export default function RecibosPage() {
                 date_to: dateTo || undefined
             });
 
-            setInvoices(response.invoices);
-            setStats(response.stats);
-            setTotalRecords(response.total);
+            setInvoices(response?.invoices || []);
+            setStats(response?.stats || {
+                total_invoiced: 0,
+                total_pending: 0,
+                total_paid: 0
+            });
+            setTotalRecords(response?.total || 0);
         } catch (error) {
             console.error("Error fetching invoices:", error);
         } finally {
@@ -158,21 +162,21 @@ export default function RecibosPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard
                     title="Total Facturado"
-                    value={`S/ ${stats.total_invoiced.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`}
+                    value={`S/ ${(stats?.total_invoiced ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}`}
                     icon={DollarSign}
                     colorClass="text-blue-500"
                     gradient="from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400"
                 />
                 <StatCard
                     title="Pendiente de Pago"
-                    value={`S/ ${stats.total_pending.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`}
+                    value={`S/ ${(stats?.total_pending ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}`}
                     icon={AlertCircle}
                     colorClass="text-amber-500"
                     gradient="from-amber-600 to-orange-600 dark:from-amber-400 dark:to-orange-400"
                 />
                 <StatCard
                     title="Recaudado (Efectivo)"
-                    value={`S/ ${stats.total_paid.toLocaleString('es-PE', { minimumFractionDigits: 2 })}`}
+                    value={`S/ ${(stats?.total_paid ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2 })}`}
                     icon={CheckCircle}
                     colorClass="text-emerald-500"
                     gradient="from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400"
@@ -314,7 +318,14 @@ export default function RecibosPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <StatusBadge state={inv.payment_state} />
+                                            <div className="flex flex-col gap-1">
+                                                <StatusBadge state={inv.payment_state} />
+                                                {inv.payment_state === 'not_paid' && inv.invoice_date_due && new Date(inv.invoice_date_due) < new Date() && (
+                                                    <span className="px-2.5 py-0.5 inline-flex items-center text-xs font-medium rounded-full border bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 animate-pulse">
+                                                        ⚠️ Vencido
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
@@ -340,11 +351,17 @@ export default function RecibosPage() {
 
                                                 {/* WhatsApp */}
                                                 <a
-                                                    href={`https://wa.me/?text=Hola ${inv.partner_name}, adjuntamos tu recibo ${inv.name} por ${inv.currency}${inv.amount_total}.`}
+                                                    href={adminInvoicesService.generateWhatsAppLink(
+                                                        inv.partner_phone || '',
+                                                        inv.partner_name,
+                                                        inv.reading?.period || inv.invoice_date,
+                                                        inv.amount_total,
+                                                        'https://tu-portal.com/mis-recibos' // Placeholder for now as PDF link is protected
+                                                    )}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-full transition-colors"
-                                                    title="Enviar por WhatsApp"
+                                                    className={`p-2 ${inv.partner_phone ? 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30' : 'text-gray-400 hover:text-green-600'} rounded-full transition-colors`}
+                                                    title={inv.partner_phone ? `Enviar a ${inv.partner_phone}` : "Enviar por WhatsApp (Sin número registrado)"}
                                                 >
                                                     <Smartphone className="w-4 h-4" />
                                                 </a>

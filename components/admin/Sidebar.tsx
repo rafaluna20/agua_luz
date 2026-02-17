@@ -78,9 +78,10 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const { logout } = useAuthStore();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    router.push("/login-admin");
+  const handleLogout = async () => {
+    await logout();
+    // Force navigation to ensure we don't get stuck in protected route states
+    router.replace("/login-admin");
   };
 
   return (

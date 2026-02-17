@@ -36,7 +36,7 @@ export default function AdminLayout({
 
     if (!isAuthenticated) {
       console.log('⚠️ AdminLayout: No autenticado, redirigiendo a login-admin...');
-      router.push("/login-admin");
+      router.replace("/login-admin");
       return () => clearTimeout(timer);
     }
 

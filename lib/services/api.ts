@@ -35,11 +35,11 @@ class ApiClient {
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const token = Cookies.get(APP_CONSTANTS.ACCESS_TOKEN_KEY);
-        
+
         if (token && config.headers) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-        
+
         return config;
       },
       (error) => {
@@ -78,7 +78,7 @@ class ApiClient {
 
           try {
             const refreshToken = Cookies.get(APP_CONSTANTS.REFRESH_TOKEN_KEY);
-            
+
             if (!refreshToken) {
               throw new Error("No refresh token available");
             }
@@ -90,7 +90,7 @@ class ApiClient {
             // Respuesta de Odoo: { success: true, data: { access_token, ... } }
             const responseData = response.data?.data || response.data;
             const access_token = responseData.access_token;
-            
+
             Cookies.set(APP_CONSTANTS.ACCESS_TOKEN_KEY, access_token, {
               expires: 1 / 96, // 15 minutos
               secure: config.environment === "production",
@@ -106,18 +106,18 @@ class ApiClient {
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${access_token}`;
             }
-            
+
             return this.client(originalRequest);
           } catch (refreshError) {
             this.failedQueue.forEach((prom) => {
               prom.reject(refreshError);
             });
             this.failedQueue = [];
-            
+
             // Limpiar tokens y redirigir al login
             this.clearAuth();
             window.location.href = "/login";
-            
+
             return Promise.reject(refreshError);
           } finally {
             this.isRefreshing = false;
@@ -144,38 +144,50 @@ class ApiClient {
   private handleError(error: any): never {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<any>;
-      
+
       if (axiosError.response) {
         // El servidor respondió con un código de error
         const responseData = axiosError.response.data;
-        
+
         // Formato de error de Odoo: { success: false, error: { code, message } }
         if (responseData?.error?.message) {
           throw new Error(responseData.error.message);
         }
-        
+
         // Otros formatos de error
         const message = responseData?.message ||
-                       responseData?.error ||
-                       ERROR_MESSAGES.SERVER_ERROR;
+          responseData?.error ||
+          ERROR_MESSAGES.SERVER_ERROR;
         throw new Error(message);
       } else if (axiosError.request) {
         // La petición se hizo pero no hubo respuesta
         throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
       }
     }
-    
+
     throw new Error(ERROR_MESSAGES.GENERIC_ERROR);
   }
 
   /**
    * GET request
    */
-  async get<T = any>(url: string, params?: any): Promise<T> {
+  async get<T = any>(url: string, params?: any, config?: any): Promise<T> {
     try {
-      const response = await this.client.get<T>(url, { params });
+      const response = await this.client.get<T>(url, { params, ...config });
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // Si el tipo de respuesta es blob y hay error, intentar leer el blob como JSON para mostrar el error
+      if (config?.responseType === 'blob' && error?.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const json = JSON.parse(text);
+          if (json.error || json.message) {
+            error.response.data = json; // Reemplazar blob con json para handleError
+          }
+        } catch (e) {
+          // No es JSON, continuar con el error original
+        }
+      }
       return this.handleError(error);
     }
   }

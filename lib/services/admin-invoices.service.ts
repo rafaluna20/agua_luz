@@ -13,13 +13,19 @@ export interface AdminInvoice {
     amount_total: number;
     currency: string;
     payment_state: 'not_paid' | 'in_payment' | 'paid' | 'reversed' | 'partial';
+    document_type: 'Boleta' | 'Factura';  // Tipo de comprobante SUNAT
+    service_type?: 'water' | 'electricity' | 'internet' | 'other';  // Tipo de servicio
+    service_name?: string;  // Nombre real del producto/servicio
+    has_informative_receipt: boolean;  // Si tiene recibo informativo disponible
+    voucher_url: string;  // URL del comprobante SUNAT (Boleta/Factura)
+    receipt_url?: string | null;  // URL del recibo informativo (solo servicios medidos)
+    download_url: string;  // Deprecated - usar voucher_url
     reading?: {
         id: number;
         period: string;
         consumption: number;
         service_type: 'water' | 'electricity';
     };
-    download_url: string;
 }
 
 
@@ -65,6 +71,7 @@ export interface AdminInvoicesFilters {
     offset?: number;
     search?: string;
     payment_state?: string;
+    service_type?: 'water' | 'electricity' | 'all';
     date_from?: string;
     date_to?: string;
 }
@@ -85,11 +92,19 @@ export class AdminInvoicesService {
 
             if (filters.search) params.append('search', filters.search);
             if (filters.payment_state && filters.payment_state !== 'all') params.append('payment_state', filters.payment_state);
+            if (filters.service_type && filters.service_type !== 'all') params.append('service_type', filters.service_type);
             if (filters.date_from) params.append('date_from', filters.date_from);
             if (filters.date_to) params.append('date_to', filters.date_to);
 
-            const response = await apiClient.get<AdminInvoicesResponse>(`/api/portal/invoices?${params.toString()}`);
-            return response;
+            const response = await apiClient.get<{ success: boolean; data: AdminInvoicesResponse }>(`/api/portal/invoices?${params.toString()}`);
+
+            // Odoo devuelve { success: true, data: {...} }, necesitamos extraer solo data
+            if (response && 'data' in response) {
+                return response.data;
+            }
+
+            // Fallback si la estructura es diferente
+            return response as any;
         } catch (error) {
             console.warn('Backend API endpoint missing or error. Using MOCK data for demonstration.');
             // Mock data fallback
@@ -105,6 +120,10 @@ export class AdminInvoicesService {
                         amount_total: 150.00,
                         currency: "S/",
                         payment_state: "not_paid",
+                        document_type: "Boleta",
+                        has_informative_receipt: true,
+                        voucher_url: "#",
+                        receipt_url: "#",
                         reading: {
                             id: 101,
                             period: "Octubre 2023",
@@ -123,6 +142,10 @@ export class AdminInvoicesService {
                         amount_total: 85.50,
                         currency: "S/",
                         payment_state: "paid",
+                        document_type: "Factura",
+                        has_informative_receipt: true,
+                        voucher_url: "#",
+                        receipt_url: "#",
                         reading: {
                             id: 102,
                             period: "Octubre 2023",
@@ -145,14 +168,30 @@ export class AdminInvoicesService {
     /**
      * Descarga PDF fiscal de factura
      */
+    /**
+     * Descarga PDF fiscal de factura
+     */
     async downloadInvoicePdf(invoiceId: number): Promise<Blob> {
         try {
-            const response = await apiClient.get(`/api/portal/invoices/${invoiceId}/pdf`, {
+            return await apiClient.get<Blob>(`/api/portal/invoice/${invoiceId}/pdf`, undefined, {
                 responseType: 'blob'
             });
-            return response.data;
         } catch (error) {
             console.error('Error downloading invoice PDF:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Descarga el Recibo Profesional (Agua/Luz) con historial y QR
+     */
+    async downloadUtilityReceipt(invoiceId: number): Promise<Blob> {
+        try {
+            return await apiClient.get<Blob>(`/api/portal/invoice/${invoiceId}/receipt`, undefined, {
+                responseType: 'blob'
+            });
+        } catch (error) {
+            console.error('Error downloading utility receipt:', error);
             throw error;
         }
     }

@@ -1,5 +1,4 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from "axios";
-import Cookies from "js-cookie";
 import { config, API_ENDPOINTS, APP_CONSTANTS, ERROR_MESSAGES } from "@/lib/config";
 import type { ApiResponse } from "@/types";
 
@@ -8,11 +7,6 @@ import type { ApiResponse } from "@/types";
  */
 class ApiClient {
   private client: AxiosInstance;
-  private isRefreshing: boolean = false;
-  private failedQueue: Array<{
-    resolve: (value?: any) => void;
-    reject: (reason?: any) => void;
-  }> = [];
 
   constructor() {
     this.client = axios.create({
@@ -28,114 +22,36 @@ class ApiClient {
   }
 
   /**
-   * Configura interceptores de request y response
+   * Interceptores. El token NO se maneja aquí: vive en cookies httpOnly y lo agrega el BFF (app/api/odoo), que
+   * también refresca la sesión cuando vence. Si aun así llega un 401, la sesión terminó de verdad: al login.
    */
   private setupInterceptors(): void {
-    // Request interceptor
-    this.client.interceptors.request.use(
-      (config: InternalAxiosRequestConfig) => {
-        const token = Cookies.get(APP_CONSTANTS.ACCESS_TOKEN_KEY);
-
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
-
-    // Response interceptor
     this.client.interceptors.response.use(
       (response) => response,
-      async (error: AxiosError) => {
-        const originalRequest = error.config as InternalAxiosRequestConfig & {
-          _retry?: boolean;
-        };
-
-        // Si el error es 401 y no estamos en refresh
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          if (this.isRefreshing) {
-            // Si ya estamos refrescando, agregar a la cola
-            return new Promise((resolve, reject) => {
-              this.failedQueue.push({ resolve, reject });
-            })
-              .then((token) => {
-                if (originalRequest.headers) {
-                  originalRequest.headers.Authorization = `Bearer ${token}`;
-                }
-                return this.client(originalRequest);
-              })
-              .catch((err) => {
-                return Promise.reject(err);
-              });
-          }
-
-          originalRequest._retry = true;
-          this.isRefreshing = true;
-
-          try {
-            const refreshToken = Cookies.get(APP_CONSTANTS.REFRESH_TOKEN_KEY);
-
-            if (!refreshToken) {
-              throw new Error("No refresh token available");
-            }
-
-            const response = await this.client.post(API_ENDPOINTS.AUTH.REFRESH, {
-              refresh_token: refreshToken,
-            });
-
-            // Respuesta de Odoo: { success: true, data: { access_token, ... } }
-            const responseData = response.data?.data || response.data;
-            const access_token = responseData.access_token;
-
-            Cookies.set(APP_CONSTANTS.ACCESS_TOKEN_KEY, access_token, {
-              expires: 1 / 96, // 15 minutos
-              secure: config.environment === "production",
-              sameSite: "strict",
-            });
-
-            // Procesar la cola de requests fallidos
-            this.failedQueue.forEach((prom) => {
-              prom.resolve(access_token);
-            });
-            this.failedQueue = [];
-
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${access_token}`;
-            }
-
-            return this.client(originalRequest);
-          } catch (refreshError) {
-            this.failedQueue.forEach((prom) => {
-              prom.reject(refreshError);
-            });
-            this.failedQueue = [];
-
-            // Limpiar tokens y redirigir al login
-            this.clearAuth();
-            window.location.href = "/login";
-
-            return Promise.reject(refreshError);
-          } finally {
-            this.isRefreshing = false;
+      (error: AxiosError) => {
+        const url = error.config?.url || "";
+        const esIntentoDeLogin = url.includes("/auth/login") || url.includes("/auth/admin-login");
+        if (error.response?.status === 401 && !esIntentoDeLogin && typeof window !== "undefined") {
+          this.clearAuth();
+          const admin = window.location.pathname.startsWith("/admin");
+          if (!window.location.pathname.startsWith("/login")) {
+            window.location.href = admin ? "/login-admin" : "/login";
           }
         }
-
         return Promise.reject(error);
       }
     );
   }
 
   /**
-   * Limpia los datos de autenticación
+   * Limpia los datos locales de la sesión (las cookies las borra el BFF al cerrar sesión o al vencer).
    */
   private clearAuth(): void {
-    Cookies.remove(APP_CONSTANTS.ACCESS_TOKEN_KEY);
-    Cookies.remove(APP_CONSTANTS.REFRESH_TOKEN_KEY);
-    localStorage.removeItem(APP_CONSTANTS.USER_KEY);
+    try {
+      localStorage.removeItem(APP_CONSTANTS.USER_KEY);
+    } catch {
+      /* almacenamiento no disponible */
+    }
   }
 
   /**

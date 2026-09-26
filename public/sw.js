@@ -1,8 +1,9 @@
 // Service Worker para sincronización en background
 // Versión: 1.0.0
 
-const CACHE_NAME = 'utility-readings-v1';
-const RUNTIME_CACHE = 'runtime-cache-v1';
+// v2: los cachés v1 guardaban respuestas de la API (facturas, clientes); al activar se borran.
+const CACHE_NAME = 'utility-readings-v2';
+const RUNTIME_CACHE = 'runtime-cache-v2';
 
 // Archivos a cachear para funcionamiento offline
 const STATIC_ASSETS = [
@@ -62,6 +63,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // La API (facturas, clientes, PDF) lleva datos personales: jamás se guarda en el caché del navegador.
+  if (new URL(event.request.url).pathname.startsWith('/api/')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -117,20 +123,12 @@ async function syncReadings() {
     
     console.log(`[SW] Sincronizando ${readings.length} lecturas...`);
     
-    // Obtener token de autenticación
-    const accessToken = await getAccessToken();
-    
-    if (!accessToken) {
-      console.error('[SW] No hay token de autenticación disponible');
-      return;
-    }
-    
-    // Enviar lecturas al servidor
-    const response = await fetch('/api/portal/readings/bulk', {
+    // Enviar lecturas al servidor por el BFF: la sesión viaja en la cookie httpOnly (el SW no puede ni debe leerla)
+    const response = await fetch('/api/odoo/api/portal/readings/bulk', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
         readings: readings.map((r) => ({
@@ -239,39 +237,6 @@ async function markReadingsAsSynced(db, localIds) {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });
-}
-
-/**
- * Obtiene el token de acceso almacenado
- */
-async function getAccessToken() {
-  const cookies = await self.cookieStore?.getAll();
-  
-  if (cookies) {
-    const accessTokenCookie = cookies.find((c) => c.name === 'access_token');
-    if (accessTokenCookie) {
-      return accessTokenCookie.value;
-    }
-  }
-  
-  // Fallback: buscar en localStorage a través de mensajes
-  const clients = await self.clients.matchAll();
-  if (clients.length > 0) {
-    return new Promise((resolve) => {
-      const messageChannel = new MessageChannel();
-      
-      messageChannel.port1.onmessage = (event) => {
-        resolve(event.data.accessToken);
-      };
-      
-      clients[0].postMessage(
-        { type: 'GET_ACCESS_TOKEN' },
-        [messageChannel.port2]
-      );
-    });
-  }
-  
-  return null;
 }
 
 /**

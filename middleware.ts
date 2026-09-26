@@ -26,7 +26,8 @@ export function middleware(request: NextRequest) {
   // Si hay token, decodificarlo para obtener el rol
   if (accessToken) {
     try {
-      const payload = decodeToken(accessToken);
+      // Un token de acceso vencido con refresco vigente sigue siendo una sesión: el BFF lo renueva en la siguiente llamada.
+      const payload = decodeToken(accessToken, !!refreshToken);
       
       if (!payload) {
         // Token inválido, limpiar cookies y redirigir
@@ -86,7 +87,7 @@ export function middleware(request: NextRequest) {
  * Decodifica un JWT token (sin verificación de firma)
  * Solo para leer el payload en el middleware
  */
-function decodeToken(token: string): { role: string; user_id: number; email: string } | null {
+function decodeToken(token: string, permitirVencido = false): { role: string; user_id: number; email: string } | null {
   try {
     const base64Url = token.split(".")[1];
     if (!base64Url) return null;
@@ -115,7 +116,7 @@ function decodeToken(token: string): { role: string; user_id: number; email: str
     
     // Verificar que no haya expirado
     const currentTime = Date.now() / 1000;
-    if (payload.exp && payload.exp < currentTime) {
+    if (!permitirVencido && payload.exp && payload.exp < currentTime) {
       return null;
     }
     

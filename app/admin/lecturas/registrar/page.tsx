@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -144,14 +143,9 @@ export default function RegistrarLecturaPage() {
 
       setLoadingSuggestions(true);
       try {
-        const token = Cookies.get("access_token");
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/portal/meters?search=${encodeURIComponent(meterCode)}&limit=5`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
+          `/api/odoo/api/portal/meters?search=${encodeURIComponent(meterCode)}&limit=5`,
+          { credentials: "same-origin" }
         );
 
         if (!response.ok) {
@@ -214,14 +208,9 @@ export default function RegistrarLecturaPage() {
 
     try {
       // Buscar en el backend
-      const token = Cookies.get("access_token");
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/portal/meters?search=${encodeURIComponent(meterCode)}&limit=1`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        `/api/odoo/api/portal/meters?search=${encodeURIComponent(meterCode)}&limit=1`,
+        { credentials: "same-origin" }
       );
 
       const data = await response.json();

@@ -422,15 +422,13 @@ export class SyncManager {
     // TODO: Implementar llamada real al API
     // Por ahora, simulamos la respuesta
     
-    const endpoint = '/api/portal/readings/bulk';
-    
+    // Por el BFF (mismo dominio): la sesión viaja en la cookie httpOnly, sin tocar tokens desde JavaScript.
+    const endpoint = '/api/odoo/api/portal/readings/bulk';
+
     const response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Incluir token JWT aquí
-        'Authorization': `Bearer ${this.getAuthToken()}`
-      },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify(request)
     });
 
@@ -439,14 +437,6 @@ export class SyncManager {
     }
 
     return await response.json();
-  }
-
-  private getAuthToken(): string {
-    // TODO: Obtener token del authStore
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('access_token') || '';
-    }
-    return '';
   }
 
   // ==================== STATUS & MONITORING ====================

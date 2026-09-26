@@ -39,12 +39,6 @@ export function ServiceWorkerRegistration() {
           console.error('❌ Error en sincronización background:', message.error);
           break;
 
-        case 'GET_ACCESS_TOKEN':
-          // Enviar el access token al Service Worker
-          const accessToken = localStorage.getItem('access_token');
-          message.ports?.[0]?.postMessage({ accessToken });
-          break;
-
         default:
           console.log('Mensaje no manejado:', message);
       }

@@ -4,7 +4,8 @@ import { AppConfig } from "@/types";
  * Configuración global de la aplicación
  */
 export const config: AppConfig = {
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8069",
+  // El navegador solo habla con el BFF de este mismo dominio (app/api/odoo): los tokens no salen de las cookies httpOnly.
+  apiUrl: "/api/odoo",
   environment: (process.env.NODE_ENV as "development" | "production") || "development",
   enableAnalytics: process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === "true",
   paymentMethods: {

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Download, QrCode, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
-import Cookies from 'js-cookie'
 import { qrGeneratorService, Stage, Block, QRGeneratorFilters as ServiceFilters } from '@/lib/services/qr-generator.service'
 
 interface QRGeneratorFilters {
@@ -107,15 +106,10 @@ export default function QRGeneratorPage() {
             // Get download URL from service
             const downloadURL = qrGeneratorService.generateBatchURL(serviceFilters)
 
-            // Get auth token
-            const token = Cookies.get('access_token')
-
-            // Download PDF directly
+            // Download PDF directly (por el BFF: la sesión va en la cookie httpOnly)
             const response = await fetch(downloadURL, {
                 method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                credentials: 'same-origin'
             })
 
             if (!response.ok) {

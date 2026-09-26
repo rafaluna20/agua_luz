@@ -20,8 +20,6 @@ export interface LoginCredentials {
 
 export interface AuthResponse {
   success: boolean;
-  access_token: string;
-  refresh_token: string;
   user: User;
   message?: string;
 }

@@ -112,6 +112,20 @@ describe("cookies", () => {
   })
 })
 
+test("urlOdoo en producción sin ODOO_URL falla en vez de elegir un servidor", () => {
+  vi.stubEnv("ODOO_URL", "")
+  vi.stubEnv("NODE_ENV", "production")
+  expect(() => urlOdoo()).toThrow("ODOO_URL")
+  vi.unstubAllEnvs()
+})
+
+test("urlOdoo en desarrollo sin ODOO_URL usa el Odoo local", () => {
+  vi.stubEnv("ODOO_URL", "")
+  vi.stubEnv("NODE_ENV", "development")
+  expect(urlOdoo()).toBe("http://localhost:8069")
+  vi.unstubAllEnvs()
+})
+
 test("urlOdoo usa la variable de entorno y quita barras finales", () => {
   vi.stubEnv("ODOO_URL", "https://odoo.example.com//")
   expect(urlOdoo()).toBe("https://odoo.example.com")

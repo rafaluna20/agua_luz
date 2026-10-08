@@ -15,10 +15,21 @@ export const SEGUNDOS_REFRESCO = 7 * 24 * 60 * 60;
 /** Tamaño máximo de un cuerpo que se reenvía a Odoo (las fotos de lecturas van en base64). */
 export const MAX_BYTES_CUERPO = 12 * 1024 * 1024;
 
-/** Base de Odoo, solo del servidor. Hoy cae al host que estaba fijo en next.config: configura ODOO_URL en el hosting. */
+/**
+ * Base de Odoo, solo del servidor. En producción ODOO_URL es obligatoria: antes caía a un host fijo (el Odoo de otra
+ * empresa), así que olvidar la variable habría enviado los inicios de sesión al servidor equivocado. En desarrollo,
+ * sin variable, se usa el Odoo local.
+ */
 export function urlOdoo(): string {
   const url = process.env.ODOO_URL?.trim();
-  return (url || "https://bot-odoo.2fsywk.easypanel.host").replace(/\/+$/, "");
+  if (!url) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("BFF: falta la variable de entorno ODOO_URL (URL del Odoo al que apunta este portal).");
+      throw new Error("ODOO_URL no está configurada");
+    }
+    return "http://localhost:8069";
+  }
+  return url.replace(/\/+$/, "");
 }
 
 /**

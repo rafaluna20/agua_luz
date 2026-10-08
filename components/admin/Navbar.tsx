@@ -2,6 +2,7 @@
 
 import { Bell, Search, Moon, Sun, User, Menu } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { ETIQUETA_ROL, rolDe } from "@/lib/permissions";
 import { useState } from "react";
 
 interface AdminNavbarProps {
@@ -162,7 +163,7 @@ export default function AdminNavbar({ onMenuClick }: AdminNavbarProps) {
                 {user?.name || "Admin"}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Administrador
+                {ETIQUETA_ROL[rolDe(user)]}
               </p>
             </div>
           </button>

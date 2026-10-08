@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/Card";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { rolDe, rutaInicial } from "@/lib/permissions";
 import { useNotifySuccess, useNotifyError } from "@/lib/stores/uiStore";
 
 // Schema de validación con Zod
@@ -45,7 +46,7 @@ export default function LoginAdminPage() {
   // Redirigir si ya está autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/admin/dashboard");
+      router.push(rutaInicial(rolDe(useAuthStore.getState().user)));
     }
   }, [isAuthenticated, router]);
 
@@ -59,14 +60,9 @@ export default function LoginAdminPage() {
 
   const onSubmit = async (data: LoginAdminFormData) => {
     try {
-      console.log('🔐 Iniciando login de administrador...');
       await loginAdmin(data);
-      console.log('✅ Login admin exitoso');
       notifySuccess("Bienvenido Administrador", "Acceso concedido");
-      
-      // Esperar un momento para que se persistan los datos
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      router.push("/admin/dashboard");
+      router.push(rutaInicial(rolDe(useAuthStore.getState().user)));
     } catch (error: any) {
       console.error("❌ Error en login admin:", error);
     }

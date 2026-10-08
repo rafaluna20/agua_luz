@@ -52,14 +52,8 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      console.log('🔐 Iniciando login...');
       await login(data);
-      console.log('✅ Login exitoso - datos guardados');
       
-      // Esperar a que se persistan cookies y localStorage
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      console.log('🔄 Navegando a dashboard...');
       notifySuccess("Bienvenido", "Redirigiendo...");
       
       // Usar router.push de Next.js

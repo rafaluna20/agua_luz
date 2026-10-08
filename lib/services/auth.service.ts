@@ -48,6 +48,8 @@ class AuthService {
         email: usuario.email,
         phone: "",
         role: "admin",
+        // Sin dato del servidor se asume el rol más bajo.
+        utility_role: ["operator", "supervisor", "manager"].includes(usuario.utility_role) ? usuario.utility_role : "operator",
       };
       this.setUser(adminUser);
       return { success: true, user: adminUser };

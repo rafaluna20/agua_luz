@@ -33,6 +33,7 @@ import {
     AdminInvoicesStats,
     AdminReceiptDetails
 } from "@/lib/services/admin-invoices.service";
+import { useNotifyError } from "@/lib/stores/uiStore";
 
 // ============================================================
 // REUSABLE COMPONENTS
@@ -381,6 +382,7 @@ const ConsumptionModal = ({
 
 export default function RecibosPage() {
     // State
+    const notifyError = useNotifyError();
     const [invoices, setInvoices] = useState<AdminInvoice[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<AdminInvoicesStats>({
@@ -428,10 +430,13 @@ export default function RecibosPage() {
             setTotalRecords(response?.total || 0);
         } catch (error) {
             console.error("Error fetching invoices:", error);
+            setInvoices([]);
+            setTotalRecords(0);
+            notifyError("No se pudieron cargar los recibos", "Revise la conexión con el servidor e intente de nuevo.");
         } finally {
             setLoading(false);
         }
-    }, [page, searchTerm, paymentState, serviceType, dateFrom, dateTo]);
+    }, [page, searchTerm, paymentState, serviceType, dateFrom, dateTo, notifyError]);
 
     useEffect(() => {
         const timer = setTimeout(() => {

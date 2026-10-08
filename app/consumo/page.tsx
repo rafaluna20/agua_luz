@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { consumptionService, type MonthlyConsumption } from "@/lib/services/consumption.service";
+import { useNotifyError } from "@/lib/stores/uiStore";
 import {
   LineChart,
   Line,
@@ -28,45 +30,30 @@ import {
   Activity,
 } from "lucide-react";
 
-// Mock data para consumo histórico
-const generateMockData = () => {
-  const months = [
-    "Ene",
-    "Feb",
-    "Mar",
-    "Abr",
-    "May",
-    "Jun",
-    "Jul",
-    "Ago",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dic",
-  ];
-
-  return months.map((month, index) => ({
-    mes: month,
-    agua: Math.floor(Math.random() * 30) + 20, // 20-50 m³
-    luz: Math.floor(Math.random() * 200) + 150, // 150-350 kWh
-    costoAgua: (Math.random() * 50 + 30).toFixed(2), // S/ 30-80
-    costoLuz: (Math.random() * 150 + 100).toFixed(2), // S/ 100-250
-  }));
-};
-
 export default function ConsumoPage() {
   const { user } = useAuthStore();
-  const [consumptionData, setConsumptionData] = useState<any[]>([]);
+  const notifyError = useNotifyError();
+  const [consumptionData, setConsumptionData] = useState<MonthlyConsumption[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<"6m" | "12m">("6m");
   const [selectedService, setSelectedService] = useState<
     "all" | "agua" | "luz"
   >("all");
 
   useEffect(() => {
-    // TODO: Fetch real data from API
-    const data = generateMockData();
-    setConsumptionData(data);
-  }, []);
+    let activo = true;
+    consumptionService
+      .getMonthly(12)
+      .then((datos) => activo && setConsumptionData(datos))
+      .catch((error) => {
+        console.error("Error cargando consumo:", error);
+        notifyError("No se pudo cargar tu consumo", error instanceof Error ? error.message : "Intenta de nuevo.");
+      })
+      .finally(() => activo && setCargando(false));
+    return () => {
+      activo = false;
+    };
+  }, [notifyError]);
 
   // Calcular estadísticas
   const stats = {
@@ -86,22 +73,27 @@ export default function ConsumoPage() {
 
   // Tendencias (comparación último mes vs promedio)
   const lastMonth = consumptionData[consumptionData.length - 1];
-  const aguaTrend = lastMonth
-    ? ((lastMonth.agua - stats.aguaPromedio) / stats.aguaPromedio) * 100
-    : 0;
-  const luzTrend = lastMonth
-    ? ((lastMonth.luz - stats.luzPromedio) / stats.luzPromedio) * 100
-    : 0;
+  const aguaTrend =
+    lastMonth && stats.aguaPromedio > 0
+      ? ((lastMonth.agua - stats.aguaPromedio) / stats.aguaPromedio) * 100
+      : 0;
+  const luzTrend =
+    lastMonth && stats.luzPromedio > 0
+      ? ((lastMonth.luz - stats.luzPromedio) / stats.luzPromedio) * 100
+      : 0;
 
   const handleExport = () => {
-    // TODO: Implementar exportación a CSV o PDF
-    const dataStr = JSON.stringify(consumptionData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
+    const filas = [
+      ["Mes", "Agua (m3)", "Luz (kWh)", "Costo agua (S/)", "Costo luz (S/)"],
+      ...consumptionData.map((d) => [d.mes, d.agua, d.luz, d.costoAgua, d.costoLuz]),
+    ];
+    const csv = filas.map((f) => f.join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `consumo-historico-${new Date().getTime()}.json`;
+    link.download = `consumo-historico-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   // Filtrar datos según período seleccionado
@@ -125,6 +117,17 @@ export default function ConsumoPage() {
           Exportar Datos
         </Button>
       </div>
+
+      {!cargando && consumptionData.length === 0 && (
+        <Card>
+          <CardContent className="pt-6 text-center py-10">
+            <p className="text-gray-700 font-medium">Aún no hay consumo registrado.</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Aparecerá aquí desde la segunda lectura de tu medidor.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-4">

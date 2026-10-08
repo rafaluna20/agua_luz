@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { User, Mail, Phone, MapPin, Lock, Save } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useNotifySuccess, useNotifyError } from "@/lib/stores/uiStore";
+import { portalCustomerService } from "@/lib/services/portal-customer.service";
 
 export default function PerfilPage() {
   const { user } = useAuthStore();
@@ -16,34 +17,79 @@ export default function PerfilPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   
-  const [formData, setFormData] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    phone: user?.phone || "",
-    address: user?.address || "",
+  const datosDe = (c?: { name?: string; email?: string; phone?: unknown; street?: unknown }) => ({
+    name: c?.name || user?.name || "",
+    email: c?.email || user?.email || "",
+    phone: typeof c?.phone === "string" ? c.phone : "",
+    address: typeof c?.street === "string" ? c.street : "",
   });
-  
+
+  const [formData, setFormData] = useState(datosDe());
+  const [original, setOriginal] = useState(datosDe());
+  const [guardando, setGuardando] = useState(false);
+  const [clienteId, setClienteId] = useState<number | null>(null);
+
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
 
-  const handleSaveProfile = () => {
-    // TODO: Llamar a la API para actualizar perfil
-    notifySuccess("Perfil actualizado", "Tus datos han sido guardados correctamente");
-    setIsEditing(false);
+  // Los datos salen del servidor, no de lo que quedó guardado en el navegador.
+  useEffect(() => {
+    let activo = true;
+    portalCustomerService
+      .getMe()
+      .then((cliente) => {
+        if (!activo) return;
+        setClienteId(cliente.id);
+        const datos = datosDe(cliente);
+        setFormData(datos);
+        setOriginal(datos);
+      })
+      .catch(() => notifyError("No se pudieron cargar tus datos", "Intenta de nuevo en unos minutos."));
+    return () => {
+      activo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const mensajeDe = (error: unknown) => (error instanceof Error ? error.message : "Intenta de nuevo en unos minutos.");
+
+  const handleSaveProfile = async () => {
+    setGuardando(true);
+    try {
+      await portalCustomerService.updateProfile({ phone: formData.phone, street: formData.address });
+      setOriginal(formData);
+      notifySuccess("Perfil actualizado", "Tus datos han sido guardados correctamente");
+      setIsEditing(false);
+    } catch (error) {
+      notifyError("No se pudo guardar tu perfil", mensajeDe(error));
+    } finally {
+      setGuardando(false);
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       notifyError("Error", "Las contraseñas no coinciden");
       return;
     }
-    // TODO: Llamar a la API para cambiar contraseña
-    notifySuccess("Contraseña actualizada", "Tu contraseña ha sido cambiada correctamente");
-    setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-    setIsChangingPassword(false);
+    if (passwordData.newPassword.length < 8) {
+      notifyError("Contraseña débil", "Debe tener al menos 8 letras, con mayúscula, minúscula, número y un símbolo.");
+      return;
+    }
+    setGuardando(true);
+    try {
+      await portalCustomerService.changePassword(passwordData.currentPassword, passwordData.newPassword);
+      notifySuccess("Contraseña actualizada", "Tu contraseña ha sido cambiada correctamente");
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setIsChangingPassword(false);
+    } catch (error) {
+      notifyError("No se pudo cambiar la contraseña", mensajeDe(error));
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -78,17 +124,11 @@ export default function PerfilPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Nombre Completo
               </label>
-              {isEditing ? (
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              ) : (
-                <div className="flex items-center space-x-2 text-gray-900">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <span>{formData.name}</span>
-                </div>
-              )}
+              <div className="flex items-center space-x-2 text-gray-900">
+                <User className="h-4 w-4 text-gray-400" />
+                <span>{formData.name}</span>
+                {isEditing && <span className="text-xs text-gray-500">(Para cambiarlo, contacte a la administración)</span>}
+              </div>
             </div>
 
             {/* Email */}
@@ -144,7 +184,7 @@ export default function PerfilPage() {
             {/* Botones de acción */}
             {isEditing && (
               <div className="flex gap-2 pt-4">
-                <Button onClick={handleSaveProfile}>
+                <Button onClick={handleSaveProfile} disabled={guardando}>
                   <Save className="h-4 w-4 mr-2" />
                   Guardar Cambios
                 </Button>
@@ -152,12 +192,7 @@ export default function PerfilPage() {
                   variant="outline"
                   onClick={() => {
                     setIsEditing(false);
-                    setFormData({
-                      name: user?.name || "",
-                      email: user?.email || "",
-                      phone: user?.phone || "",
-                      address: user?.address || "",
-                    });
+                    setFormData(original);
                   }}
                 >
                   Cancelar
@@ -228,7 +263,7 @@ export default function PerfilPage() {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button onClick={handleChangePassword}>
+                <Button onClick={handleChangePassword} disabled={guardando}>
                   Actualizar Contraseña
                 </Button>
                 <Button
@@ -264,7 +299,7 @@ export default function PerfilPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">ID de Cliente:</span>
-              <span className="font-medium text-gray-900">{user?.customer_id || "N/A"}</span>
+              <span className="font-medium text-gray-900">{clienteId ?? user?.customer_id ?? "N/A"}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Estado:</span>

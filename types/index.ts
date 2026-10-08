@@ -2,12 +2,15 @@
 // TIPOS DE AUTENTICACIÓN
 // ==========================================
 export type UserRole = 'cliente' | 'admin';
+export type StaffRole = 'operator' | 'supervisor' | 'manager';
 
 export interface User {
   id: number;
   email: string;
   name: string;
   role: UserRole;
+  /** Rol del personal (solo administradores): lector, supervisor o gerente. */
+  utility_role?: StaffRole;
   customer_id?: number;
   phone?: string;
   address?: string;

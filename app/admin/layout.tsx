@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { puedeVer, rolDe, rutaInicial } from "@/lib/permissions";
 import AdminSidebar from "@/components/admin/Sidebar";
 import AdminNavbar from "@/components/admin/Navbar";
 
@@ -12,6 +13,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isAuthenticated, checkAuth } = useAuthStore();
   const [showManualRedirect, setShowManualRedirect] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -46,12 +48,18 @@ export default function AdminLayout({
       return () => clearTimeout(timer);
     }
 
+    // Una pantalla que el rol no puede ver lleva a la que sí (el servidor igual rechaza los datos).
+    if (!puedeVer(rolDe(user), pathname)) {
+      router.replace(rutaInicial(rolDe(user)));
+      return () => clearTimeout(timer);
+    }
+
     console.log('✅ AdminLayout: Usuario admin autenticado correctamente');
     return () => clearTimeout(timer);
-  }, [isAuthenticated, user, router, isChecking]);
+  }, [isAuthenticated, user, router, isChecking, pathname]);
 
   // Mostrar un loader mientras se verifica la autenticación
-  if (!isAuthenticated || user?.role !== "admin") {
+  if (!isAuthenticated || user?.role !== "admin" || !puedeVer(rolDe(user), pathname)) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

@@ -41,15 +41,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
    * Inicia sesión como cliente
    */
   login: async (credentials: LoginCredentials) => {
-    console.log('🔐 AuthStore: Iniciando login...');
     set({ isLoading: true, error: null });
 
     try {
       const response = await authService.login(credentials);
-      console.log('📦 AuthStore: Respuesta del servicio:', { success: response.success, hasUser: !!response.user });
 
       if (response.success && response.user) {
-        console.log('✅ AuthStore: Login exitoso, actualizando estado...');
         set({
           user: response.user,
           isAuthenticated: true,
@@ -57,14 +54,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           error: null,
         });
         
-        console.log('✅ AuthStore: Estado actualizado, isAuthenticated=true, user:', response.user.email);
 
         // Iniciar refresh automático del token
         get().startTokenRefresh();
         
         // Verificar que el estado se actualizó correctamente
         const currentState = get();
-        console.log('🔍 AuthStore: Verificación final - isAuthenticated:', currentState.isAuthenticated);
       } else {
         throw new Error(response.message || "Error al iniciar sesión");
       }
@@ -84,15 +79,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
    * Inicia sesión como administrador
    */
   loginAdmin: async (credentials: LoginCredentials) => {
-    console.log('🔐 AuthStore: Iniciando login admin...');
     set({ isLoading: true, error: null });
 
     try {
       const response = await authService.loginAdmin(credentials);
-      console.log('📦 AuthStore: Respuesta del servicio admin:', { success: response.success, hasUser: !!response.user });
 
       if (response.success && response.user) {
-        console.log('✅ AuthStore: Login admin exitoso, actualizando estado...');
         set({
           user: response.user,
           isAuthenticated: true,
@@ -100,14 +92,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           error: null,
         });
         
-        console.log('✅ AuthStore: Estado admin actualizado, isAuthenticated=true, user:', response.user.email);
 
         // Iniciar refresh automático del token
         get().startTokenRefresh();
         
         // Verificar que el estado se actualizó correctamente
         const currentState = get();
-        console.log('🔍 AuthStore: Verificación final admin - isAuthenticated:', currentState.isAuthenticated);
       } else {
         throw new Error(response.message || "Error al iniciar sesión como administrador");
       }
@@ -157,13 +147,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
    * Verifica si hay una sesión activa
    */
   checkAuth: () => {
-    console.log('🔍 AuthStore: checkAuth ejecutándose...');
     
     try {
       const isAuth = authService.isAuthenticated();
       const user = authService.getCurrentUser();
       
-      console.log('📊 AuthStore: checkAuth resultado - isAuth:', isAuth, 'user:', user?.email || null);
 
       set({
         isAuthenticated: isAuth,
@@ -172,10 +160,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       // Si hay sesión, iniciar refresh del token
       if (isAuth) {
-        console.log('✅ AuthStore: Sesión activa, iniciando token refresh');
         get().startTokenRefresh();
       } else {
-        console.log('❌ AuthStore: No hay sesión activa');
         // Limpiar cualquier dato corrupto
         authService['clearAuth']();
       }

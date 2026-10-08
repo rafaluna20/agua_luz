@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useCallback } from "react";
 import type { Notification, NotificationType } from "@/types";
 import { generateId } from "@/lib/utils";
 import { APP_CONSTANTS } from "@/lib/config";
@@ -126,8 +127,12 @@ export const useUIStore = create<UIStore>((set, get) => ({
  */
 export const useNotifySuccess = () => {
   const addNotification = useUIStore((state) => state.addNotification);
-  return (title: string, message: string, duration?: number) =>
-    addNotification("success", title, message, duration);
+  // Estable entre renders: se usa en dependencias de useEffect/useCallback.
+  return useCallback(
+    (title: string, message: string, duration?: number) =>
+      addNotification("success", title, message, duration),
+    [addNotification]
+  );
 };
 
 /**
@@ -135,8 +140,12 @@ export const useNotifySuccess = () => {
  */
 export const useNotifyError = () => {
   const addNotification = useUIStore((state) => state.addNotification);
-  return (title: string, message: string, duration?: number) =>
-    addNotification("error", title, message, duration);
+  // Estable entre renders: se usa en dependencias de useEffect/useCallback.
+  return useCallback(
+    (title: string, message: string, duration?: number) =>
+      addNotification("error", title, message, duration),
+    [addNotification]
+  );
 };
 
 /**
@@ -144,8 +153,12 @@ export const useNotifyError = () => {
  */
 export const useNotifyWarning = () => {
   const addNotification = useUIStore((state) => state.addNotification);
-  return (title: string, message: string, duration?: number) =>
-    addNotification("warning", title, message, duration);
+  // Estable entre renders: se usa en dependencias de useEffect/useCallback.
+  return useCallback(
+    (title: string, message: string, duration?: number) =>
+      addNotification("warning", title, message, duration),
+    [addNotification]
+  );
 };
 
 /**
@@ -153,6 +166,10 @@ export const useNotifyWarning = () => {
  */
 export const useNotifyInfo = () => {
   const addNotification = useUIStore((state) => state.addNotification);
-  return (title: string, message: string, duration?: number) =>
-    addNotification("info", title, message, duration);
+  // Estable entre renders: se usa en dependencias de useEffect/useCallback.
+  return useCallback(
+    (title: string, message: string, duration?: number) =>
+      addNotification("info", title, message, duration),
+    [addNotification]
+  );
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Droplet, 
@@ -15,99 +15,41 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { formatCurrency, formatDate, getStatusColor, translateStatus } from "@/lib/utils";
-
-// Datos de ejemplo
-const mockRecibos = [
-  {
-    id: 1,
-    numero_recibo: "REC-2024-001",
-    servicio: "Agua",
-    periodo: "Enero 2024",
-    fecha_emision: "2024-01-05",
-    fecha_vencimiento: "2024-02-15",
-    lectura_anterior: 150,
-    lectura_actual: 168,
-    consumo: 18,
-    subtotal: 72.50,
-    igv: 13.00,
-    total: 85.50,
-    estado: "pendiente",
-  },
-  {
-    id: 2,
-    numero_recibo: "REC-2024-002",
-    servicio: "Luz",
-    periodo: "Enero 2024",
-    fecha_emision: "2024-01-05",
-    fecha_vencimiento: "2024-02-20",
-    lectura_anterior: 1850,
-    lectura_actual: 2095,
-    consumo: 245,
-    subtotal: 132.50,
-    igv: 24.30,
-    total: 156.80,
-    estado: "pendiente",
-  },
-  {
-    id: 3,
-    numero_recibo: "REC-2023-012",
-    servicio: "Agua",
-    periodo: "Diciembre 2023",
-    fecha_emision: "2023-12-05",
-    fecha_vencimiento: "2024-01-15",
-    lectura_anterior: 135,
-    lectura_actual: 150,
-    consumo: 15,
-    subtotal: 61.20,
-    igv: 11.10,
-    total: 72.30,
-    estado: "pagado",
-    fecha_pago: "2024-01-10",
-  },
-  {
-    id: 4,
-    numero_recibo: "REC-2023-011",
-    servicio: "Luz",
-    periodo: "Diciembre 2023",
-    fecha_emision: "2023-12-05",
-    fecha_vencimiento: "2024-01-20",
-    lectura_anterior: 1630,
-    lectura_actual: 1850,
-    consumo: 220,
-    subtotal: 118.00,
-    igv: 21.20,
-    total: 139.20,
-    estado: "pagado",
-    fecha_pago: "2024-01-12",
-  },
-  {
-    id: 5,
-    numero_recibo: "REC-2023-010",
-    servicio: "Agua",
-    periodo: "Noviembre 2023",
-    fecha_emision: "2023-11-05",
-    fecha_vencimiento: "2023-12-15",
-    lectura_anterior: 118,
-    lectura_actual: 135,
-    consumo: 17,
-    subtotal: 68.50,
-    igv: 12.30,
-    total: 80.80,
-    estado: "pagado",
-    fecha_pago: "2023-12-10",
-  },
-];
+import { adminInvoicesService } from "@/lib/services/admin-invoices.service";
+import { aRecibo, CLAVE_ESTADO, descargarRecibo, type Recibo } from "@/lib/receipts";
+import { useNotifyError } from "@/lib/stores/uiStore";
 
 type FilterType = "todos" | "pendiente" | "pagado" | "vencido";
 
 export default function RecibosPage() {
   const router = useRouter();
+  const notifyError = useNotifyError();
+  const [recibos, setRecibos] = useState<Recibo[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterEstado, setFilterEstado] = useState<FilterType>("todos");
   const [filterServicio, setFilterServicio] = useState<string>("todos");
 
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      const respuesta = await adminInvoicesService.getInvoices({ limit: 100 });
+      setRecibos((respuesta?.invoices ?? []).map((f) => aRecibo(f)));
+    } catch (error) {
+      console.error("Error cargando recibos:", error);
+      setRecibos([]);
+      notifyError("No se pudieron cargar tus recibos", error instanceof Error ? error.message : "Intenta de nuevo en unos minutos.");
+    } finally {
+      setCargando(false);
+    }
+  }, [notifyError]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
   // Filtrar recibos
-  const recibosFiltrados = mockRecibos.filter((recibo) => {
+  const recibosFiltrados = recibos.filter((recibo) => {
     const matchSearch = 
       recibo.numero_recibo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recibo.periodo.toLowerCase().includes(searchTerm.toLowerCase());
@@ -119,9 +61,9 @@ export default function RecibosPage() {
     return matchSearch && matchEstado && matchServicio;
   });
 
-  // Calcular totales
+  // Calcular totales (lo vencido también es deuda pendiente)
   const totalPendiente = recibosFiltrados
-    .filter((r) => r.estado === "pendiente")
+    .filter((r) => r.estado !== "pagado")
     .reduce((sum, r) => sum + r.total, 0);
 
   const totalPagado = recibosFiltrados
@@ -132,9 +74,12 @@ export default function RecibosPage() {
     router.push(`/recibos/${reciboId}`);
   };
 
-  const handleDescargar = (reciboId: number) => {
-    console.log("Descargar recibo:", reciboId);
-    // TODO: Implementar descarga real
+  const handleDescargar = async (recibo: Recibo) => {
+    try {
+      await descargarRecibo(recibo);
+    } catch {
+      notifyError("No se pudo descargar el recibo", "Intenta de nuevo en unos minutos.");
+    }
   };
 
   return (
@@ -251,7 +196,7 @@ export default function RecibosPage() {
         {recibosFiltrados.length === 0 ? (
           <Card>
             <CardContent className="pt-6 text-center py-12">
-              <p className="text-gray-500">No se encontraron recibos</p>
+              <p className="text-gray-500">{cargando ? "Cargando tus recibos..." : "No se encontraron recibos"}</p>
             </CardContent>
           </Card>
         ) : (
@@ -278,19 +223,18 @@ export default function RecibosPage() {
                         <h3 className="font-semibold text-gray-900">
                           {recibo.numero_recibo}
                         </h3>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(recibo.estado)}`}>
-                          {translateStatus(recibo.estado)}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(CLAVE_ESTADO[recibo.estado])}`}>
+                          {translateStatus(CLAVE_ESTADO[recibo.estado])}
                         </span>
                       </div>
                       <p className="text-sm text-gray-600 mt-1">
                         {recibo.servicio} • {recibo.periodo}
                       </p>
                       <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                        <span>Consumo: {recibo.consumo} {recibo.servicio === "Agua" ? "m³" : "kWh"}</span>
-                        <span>Vence: {formatDate(recibo.fecha_vencimiento)}</span>
-                        {recibo.fecha_pago && (
-                          <span>Pagado: {formatDate(recibo.fecha_pago)}</span>
+                        {recibo.consumo !== null && (
+                          <span>Consumo: {recibo.consumo} {recibo.servicio === "Agua" ? "m³" : "kWh"}</span>
                         )}
+                        <span>Vence: {formatDate(recibo.fecha_vencimiento)}</span>
                       </div>
                     </div>
                   </div>
@@ -316,7 +260,7 @@ export default function RecibosPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDescargar(recibo.id)}
+                        onClick={() => handleDescargar(recibo)}
                       >
                         <Download className="h-4 w-4" />
                       </Button>

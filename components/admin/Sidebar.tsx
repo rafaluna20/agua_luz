@@ -14,9 +14,12 @@ import {
   ChevronLeft,
   ChevronRight,
   QrCode,
+  Scale,
+  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { puedeVer, rolDe } from "@/lib/permissions";
 import { useRouter } from "next/navigation";
 
 interface NavItem {
@@ -52,6 +55,16 @@ const navItems: NavItem[] = [
     icon: BookOpen,
   },
   {
+    name: "Conciliación",
+    href: "/admin/conciliacion",
+    icon: Scale,
+  },
+  {
+    name: "Morosos y cortes",
+    href: "/admin/morosos",
+    icon: AlertTriangle,
+  },
+  {
     name: "Recibos",
     href: "/admin/recibos",
     icon: FileText,
@@ -81,7 +94,9 @@ interface AdminSidebarProps {
 export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuthStore();
+  const { logout, user } = useAuthStore();
+  // Cada rol ve solo las pantallas que le corresponden (el servidor también lo exige).
+  const visibles = navItems.filter((item) => puedeVer(rolDe(user), item.href));
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleLogout = async () => {
@@ -143,7 +158,7 @@ export default function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibles.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
 

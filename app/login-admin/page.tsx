@@ -22,8 +22,8 @@ const loginAdminSchema = z.object({
     .email("Email inválido"),
   password: z
     .string()
-    .min(1, "La contraseña es requerida")
-    .min(8, "La contraseña debe tener al menos 8 caracteres"),
+    // Al entrar no se exige largo: la clave es la de Odoo y esa regla se aplica al crearla, no al iniciar sesión.
+    .min(1, "La contraseña es requerida"),
 });
 
 type LoginAdminFormData = z.infer<typeof loginAdminSchema>;
